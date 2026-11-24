@@ -4,8 +4,10 @@ __pycache__/
 .venv/
 venv/
 *.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
 *.db
 products*.csv
-*.jsonl
+*.tmp
 .env
 .DS_Store

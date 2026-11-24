@@ -1,71 +1,43 @@
-# FixPart Catalog Sampler
+# Permission-Respecting Catalog Sampler
 
-A small, permission-respecting Python sampler for product pages that a site
-owner has authorized you to crawl.
+A Python sampler for product pages on a domain you are explicitly authorized to crawl.
 
-It reads sitemap locations advertised by `robots.txt`, checks crawler rules,
-and extracts `Product` JSON-LD fields (`name`, `offers.price`, and currency).
-It stores progress in SQLite and exports CSV.
+## Safety and scope
 
-## Important scope
+- Reads sitemap locations advertised in `robots.txt`.
+- Checks `robots.txt` before fetching sitemap and product URLs.
+- Uses a transparent User-Agent with a contact address.
+- Does not bypass logins, CAPTCHAs, anti-bot controls, rate limits, or access restrictions.
+- Stops on HTTP 403, 429, redirects, and server errors.
+- Starts with a maximum of 100 product pages and 25 sitemap files per run.
+- This project has not been verified against FixPart and is not evidence of permission to collect FixPart's catalog.
 
-This is **not** a stealth scraper and does not bypass bot protection, CAPTCHAs,
-access controls, rate limits, or site restrictions. It stops on HTTP 403, 429,
-and 5xx responses. Do not run it against FixPart or scale it to a large catalog
-unless you have written authorization and an agreed crawl budget.
+## Setup (Windows PowerShell)
 
-The current script is intentionally capped at 100 sitemap URLs per run and
-requires a minimum 3-second delay. A public sitemap is not permission to bulk
-copy a site's catalog.
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt pytest
+```
 
-## Setup
+## Tests
 
-Python 3.10 or newer is recommended.
-
-```bash
-python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# macOS/Linux:
-source .venv/bin/activate
-
-pip install -r requirements.txt
+```powershell
+python -m pytest -q
 ```
 
 ## Run a small authorized sample
 
-Use a transparent crawler identity and a real contact email:
+Use only a domain for which you have written permission. Replace the example domain and contact address with approved values.
 
-```bash
-python catalog_scraper.py --base-url https://example.com --limit 25 --delay 5 --user-agent "CatalogResearch/0.1 (contact: you@example.com)" --db sample.sqlite3 --output products_sample.csv
+```powershell
+python catalog_scraper.py --base-url https://example.test --limit 10 --max-sitemaps 2 --delay 5 --user-agent "CatalogResearch/0.1 (contact: you@example.com)" --db sample.sqlite3 --output products_sample.csv
 ```
 
-Replace `https://example.com` with a domain you are authorized to crawl.
+The database stores sitemap and product queues. Re-running the same command resumes pending work instead of repeatedly starting at the first product URLs. The CSV export streams rows in batches.
 
-## Output
+## Files
 
-CSV columns:
-
-- `title`
-- `price`
-- `currency`
-- `url`
-
-SQLite tracks attempted URLs and unique products so an interrupted sample can
-resume without duplicating records.
-
-## Current limitations
-
-- Only sitemap URLs advertised by `robots.txt` are discovered.
-- Only Product JSON-LD is parsed.
-- Pages without structured Product data are skipped rather than guessed.
-- The initial URL cap is 100 per run.
-- This has not been verified against FixPart and makes no claim that all
-  products are exposed in public sitemaps.
-
-## Tests
-
-```bash
-pip install pytest
-pytest -q
-```
+- `catalog_scraper.py`: crawler, JSON-LD extraction, SQLite queues, CSV export
+- `tests/test_extraction.py`: structured-data parsing tests
+- `tests/test_storage.py`: queue deduplication and CSV export tests
