@@ -52,3 +52,23 @@ def test_extracts_product_from_graph():
 def test_returns_none_when_no_product_jsonld():
     html = '<html><body><h1>Not a product page</h1></body></html>'
     assert extract_product(html, "https://example.test/") is None
+
+
+def test_product_without_price_returns_empty_price():
+    html = '''
+    <script type="application/ld+json">
+    {
+        "@type": "Product",
+        "name": "Washing Machine Filter"
+    }
+    </script>
+    '''
+
+    result = extract_product(
+        html,
+        "https://example.test/filter"
+    )
+
+    assert result is not None
+    assert result["title"] == "Washing Machine Filter"
+    assert result["price"] == ""
