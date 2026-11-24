@@ -161,43 +161,91 @@ def has_type(obj: dict, wanted: str) -> bool:
     return any(str(item).split("/")[-1].lower() == wanted.lower() for item in types)
 
 
+
 def extract_product(html: str, page_url: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
 
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+    for script in soup.find_all(
+        "script", attrs={"type": "application/ld+json"}
+    ):
         raw = script.string or script.get_text()
+
         if not raw or not raw.strip():
             continue
+
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError):
             continue
 
         for obj in iter_jsonld_objects(data):
+            if not isinstance(obj, dict):
+                continue
+
             if not has_type(obj, "Product"):
                 continue
 
             title = obj.get("name")
-            offers = obj.get("offers", {})
-            if isinstance(offers, list):
-                offers = offers[0] if offers else {}
-            price = None
-            currency = None
 
+            if not isinstance(title, str) or not title.strip():
+                continue
+
+            offers = obj.get("offers", [])
             if isinstance(offers, dict):
-                price = offers.get("price")
-                currency = offers.get("priceCurrency")
-                if price is None and isinstance(offers.get("priceSpecification"), dict):
-                    price = offers["priceSpecification"].get("price")
-                    currency = currency or offers["priceSpecification"].get("priceCurrency")
+                offers = [offers]
 
-            if title:
-                return {
-                    "title": str(title).strip(),
-                    "price": str(price).strip() if price is not None else "",
-                    "currency": str(currency).strip() if currency else "",
-                    "url": page_url,
-                }
+            if not isinstance(offers, list):
+                offers = []
+
+            price = ""
+            currency = ""
+
+            for offer in offers:
+                if not isinstance(offer, dict):
+                    continue
+
+                currency = (
+                    offer.get("priceCurrency")
+                    or currency
+                )
+
+                value = offer.get("price")
+
+                if value is None:
+                    value = offer.get("lowPrice")
+
+                if value is None:
+                    value = offer.get("highPrice")
+
+                if value is None:
+                    specifications = offer.get(
+                        "priceSpecification", []
+                    )
+
+                    if isinstance(specifications, dict):
+                        specifications = [specifications]
+
+                    if isinstance(specifications, list):
+                        for specification in specifications:
+                            if isinstance(specification, dict):
+                                value = specification.get("price")
+                                if value is not None:
+                                    currency = (
+                                        specification.get("priceCurrency")
+                                        or currency
+                                    )
+                                    break
+
+                if value is not None:
+                    price = str(value).strip()
+                    break
+
+            return {
+                "title": title.strip(),
+                "price": price,
+                "currency": str(currency).strip(),
+                "url": page_url,
+            }
 
     return None
 
